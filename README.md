@@ -1,112 +1,187 @@
+<div align="center">
+
 # Azure Kubernetes Platform
 
-Production-style Azure Kubernetes Service (AKS) platform project demonstrating how to provision, secure, and operate a Kubernetes platform with Terraform.
+### AKS · Terraform · Platform Engineering · Cloud Security
 
-## Architecture
+**A production-style Azure Kubernetes foundation designed around repeatable infrastructure, workload isolation and identity-based access.**
+
+<p>
+  <img src="https://img.shields.io/badge/Azure-AKS-0078D4?style=for-the-badge&logo=microsoftazure" alt="Azure AKS" />
+  <img src="https://img.shields.io/badge/Terraform-IaC-7B42BC?style=for-the-badge&logo=terraform" alt="Terraform" />
+  <img src="https://img.shields.io/badge/Kubernetes-Platform-326CE5?style=for-the-badge&logo=kubernetes" alt="Kubernetes" />
+  <img src="https://img.shields.io/badge/Azure_RBAC-Security-0078D4?style=for-the-badge&logo=microsoft" alt="Azure RBAC" />
+  <img src="https://img.shields.io/badge/GitHub_Actions-CI-2088FF?style=for-the-badge&logo=githubactions" alt="GitHub Actions" />
+</p>
+
+</div>
+
+---
+
+## 🎯 Project objective
+
+This repository demonstrates how I approach **platform engineering on Azure**: provision the Kubernetes foundation with Terraform, isolate infrastructure concerns into reusable modules, use managed identity instead of long-lived credentials, and separate system workloads from application workloads.
+
+The current implementation intentionally focuses on the **infrastructure/platform layer**. GitOps, observability, application deployment and advanced production controls are planned as separate layers rather than being mixed into one Terraform stack.
+
+---
+
+## 🏗️ Architecture
 
 ```text
-                    Azure
-                      |
-              +-------+-------+
-              | Resource Group |
-              +-------+-------+
-                      |
-                Azure VNet
-                      |
-        +-------------+-------------+
-        |                           |
-   System Subnet              User Subnet
-        |                           |
-        +-------------+-------------+
-                      |
-                     AKS
-              +-------+-------+
-              |               |
-        System Node Pool   User Node Pool
-              |               |
-              +-------+-------+
-                      |
-                Kubernetes Apps
+                              Azure
+                                │
+                         Resource Group
+                                │
+                         ┌──────┴──────┐
+                         │    VNet      │
+                         │ 10.30.0.0/16 │
+                         └──────┬──────┘
+                                │
+                         AKS Subnet
+                                │
+                    ┌───────────┴───────────┐
+                    │          AKS           │
+                    │                        │
+                    │  Azure RBAC + Identity │
+                    │                        │
+                    └───────────┬────────────┘
+                                │
+                 ┌──────────────┴──────────────┐
+                 │                             │
+          System Node Pool              User Node Pool
+          Kubernetes services           Application workloads
+                 │                             │
+                 └──────────────┬──────────────┘
+                                │
+                         Future platform layer
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                  GitOps              Observability
+                Argo CD              Prometheus/Grafana
 ```
 
-## Goals
+The Terraform implementation creates an Azure resource group, VNet, dedicated AKS subnet, security resources and AKS cluster through reusable modules. fileciteturn44file0L2-L2 fileciteturn46file0L2-L2
 
-- Provision AKS using Terraform
-- Use Azure managed identities instead of long-lived credentials
-- Enable Azure RBAC for Kubernetes authorization
-- Separate system and user workloads
-- Use Azure networking rather than the default cluster network
-- Keep infrastructure modular and environment-friendly
-- Validate Terraform changes through CI
-- Provide a foundation for the GitOps and observability repositories in this portfolio
+---
 
-## Repository structure
+## ⭐ Platform capabilities
+
+| Capability | Implementation |
+|---|---|
+| Infrastructure as Code | Terraform modules and environment configuration |
+| Kubernetes | Azure Kubernetes Service (AKS) |
+| Identity | System-assigned managed identity |
+| Authorization | Azure RBAC integration |
+| Workload isolation | Dedicated system and user node pools |
+| Networking | Azure VNet + AKS subnet + Azure CNI overlay |
+| Network security | Azure Network Security Group foundation |
+| CI validation | GitHub Actions + Terraform format/validate |
+| Environment design | Environment-specific Terraform root module |
+| Cost awareness | Separate system/user pools and configurable VM sizes |
+
+The AKS module explicitly enables Azure RBAC and uses separate system and user node pools. fileciteturn45file0L2-L2
+
+---
+
+## 📁 Repository structure
 
 ```text
-.
+azure-kubernetes-platform/
+│
 ├── environments/
 │   └── dev/
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+│
 ├── modules/
 │   ├── aks/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   │
 │   ├── networking/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   └── outputs.tf
+│   │
 │   └── security/
-├── architecture/
-│   └── architecture.md
+│       ├── main.tf
+│       ├── variables.tf
+│       └── outputs.tf
+│
 ├── .github/workflows/
 │   └── terraform.yml
-├── .gitignore
-├── Makefile
+│
 └── README.md
 ```
 
-## Platform design
+The environment root composes the networking, security and AKS modules instead of placing all resources in one large Terraform file. fileciteturn44file0L2-L2
 
-### AKS
+---
 
-The cluster uses a dedicated system node pool for Kubernetes system components and a user node pool for application workloads. This prevents application scheduling from unnecessarily competing with critical cluster services.
+## ☸️ AKS design
+
+### System and user node pools
+
+The cluster uses a dedicated system node pool for Kubernetes system components and a separate user node pool for application workloads. The user pool is labelled `workload-type=application`, creating a foundation for future workload scheduling policies. fileciteturn45file0L2-L2
 
 ### Identity
 
-The design uses Azure managed identity. The goal is to avoid storing Azure client secrets in source control or CI/CD configuration.
+The AKS cluster uses a **system-assigned managed identity**, avoiding the need to place long-lived Azure credentials in Terraform configuration. fileciteturn45file0L2-L2
 
 ### Authorization
 
-Azure RBAC is used for Azure resource access and AKS RBAC integration. Kubernetes access should follow least-privilege principles and be scoped to the required namespace or resource set where practical.
+Azure RBAC integration is enabled at the AKS layer. The broader portfolio pairs this platform with the separate IAM automation project so identity policy can be validated independently from cluster provisioning. fileciteturn45file0L2-L2
 
 ### Networking
 
-The cluster is placed inside an Azure VNet with dedicated subnets. Network security controls are kept separate from application deployment concerns.
+The platform uses an Azure VNet and dedicated AKS subnet. AKS is configured with Azure networking, overlay mode and Azure network policy. fileciteturn45file0L2-L2
 
-## Deployment flow
+---
+
+## 🔄 Infrastructure delivery flow
 
 ```text
-Terraform code
-      ↓
+Developer change
+      │
+      ▼
 GitHub Pull Request
-      ↓
-terraform fmt
-      ↓
-terraform validate
-      ↓
-terraform plan
-      ↓
-Code Review
-      ↓
-terraform apply
-      ↓
+      │
+      ├── terraform fmt -check
+      ├── terraform init -backend=false
+      └── terraform validate
+      │
+      ▼
+Code review
+      │
+      ▼
+Approved infrastructure change
+      │
+      ▼
+Terraform plan
+      │
+      ▼
+Controlled apply
+      │
+      ▼
 AKS platform
 ```
 
-## Local usage
+The current GitHub Actions workflow validates formatting and Terraform configuration on relevant pull requests and pushes to `main`. It does not automatically deploy infrastructure. fileciteturn43file0L2-L2
+
+---
+
+## 🧪 Local validation
 
 Requirements:
 
 - Terraform >= 1.6
 - Azure CLI
-- An Azure subscription
+- Azure subscription
 - Appropriate Azure permissions
-
-Authenticate locally with Azure CLI, then run:
 
 ```bash
 az login
@@ -119,58 +194,131 @@ terraform validate
 terraform plan
 ```
 
-Do not commit subscription IDs that are intended to remain private, credentials, client secrets, kubeconfigs, Terraform state, or other sensitive values.
+The development environment currently defaults to `canadacentral` and uses a `10.30.0.0/16` VNet with a `10.30.0.0/22` AKS subnet. fileciteturn50file0L2-L2
 
-## CI/CD
+Never commit credentials, client secrets, kubeconfigs, Terraform state or other sensitive values.
 
-GitHub Actions validates Terraform formatting and configuration. Infrastructure deployment should require an explicit reviewed change rather than automatically applying every pull request.
+---
 
-## Security considerations
+## 🔐 Security model
 
-- Managed identity instead of static Azure credentials
-- Azure RBAC and least-privilege access
-- Dedicated network boundaries
-- Separate system and application workloads
-- No secrets committed to Git
-- Terraform state should be stored remotely with appropriate access controls for real deployments
-- Production deployments should use protected environments and approvals
+The platform follows several security principles:
 
-## Operational considerations
+- **Identity-based authentication** instead of static credentials
+- **Azure RBAC** for centralized authorization
+- **Network boundaries** around the AKS platform
+- **Workload separation** between system and application nodes
+- **Infrastructure validation** before changes are applied
+- **No automatic production mutation from pull requests**
 
-A real production implementation should additionally consider:
+The security module currently creates the Network Security Group foundation associated with the platform. fileciteturn47file0L2-L2
 
-- Azure Monitor / Container Insights
-- Prometheus and Grafana
-- OpenTelemetry
-- Cluster autoscaling
-- Pod disruption budgets
-- Network policies
-- Private AKS/API endpoint strategy
-- Azure Key Vault integration
-- Backup and disaster recovery
-- Cost controls and resource tagging
+For a real production deployment, this foundation should be extended with explicit NSG rules, private cluster strategy, Key Vault integration, policy enforcement and workload-level network policies.
 
-Those concerns are intentionally separated so this repository can serve as the infrastructure layer for the GitOps and SRE observability projects that follow.
+---
 
-## Portfolio connection
+## 🧠 Architecture decisions
 
-This project is the **platform layer** of the portfolio:
+### Why Terraform modules?
+
+Networking, security and AKS are separated so each concern can evolve independently and be reused across environments.
+
+### Why separate system and user node pools?
+
+Critical Kubernetes services should not compete directly with application workloads for the same scheduling capacity.
+
+### Why managed identity?
+
+Long-lived service credentials create unnecessary operational and security risk. Managed identity removes the need to distribute those credentials.
+
+### Why validate but not auto-apply?
+
+Infrastructure changes should be reviewable. The current CI pipeline intentionally stops at validation so deployment can be introduced later with explicit environment protection and approval.
+
+### Why keep observability and GitOps separate?
+
+The portfolio is designed as composable engineering layers: infrastructure first, then GitOps, then observability. This keeps responsibilities clear and makes each repository independently understandable.
+
+---
+
+## 📊 Production-readiness roadmap
+
+### Current foundation
+
+- [x] Modular Terraform architecture
+- [x] AKS cluster provisioning
+- [x] Managed identity
+- [x] Azure RBAC integration
+- [x] System/user node pool separation
+- [x] Azure VNet and dedicated subnet
+- [x] Terraform CI validation
+
+### Next engineering layer
+
+- [ ] Remote Terraform state with locking
+- [ ] Terraform plan output in pull requests
+- [ ] OIDC / workload identity federation for GitHub Actions
+- [ ] Terraform security scanning with Checkov or tfsec
+- [ ] Explicit NSG rules
+- [ ] AKS private cluster design
+- [ ] Azure Key Vault integration
+- [ ] Network policies and workload security
+- [ ] Cluster autoscaler / workload autoscaling
+- [ ] Pod disruption budgets
+- [ ] Azure Monitor / Container Insights
+- [ ] Prometheus + Grafana
+- [ ] Argo CD GitOps deployment
+- [ ] Disaster recovery and backup strategy
+- [ ] Cost and resource governance
+
+---
+
+## 🔗 Portfolio architecture
+
+This repository is the **Kubernetes platform layer** in my broader Cloud / DevOps / SRE portfolio:
 
 ```text
-Azure Terraform Infrastructure
-          ↓
-    AKS Platform
-          ↓
-   Argo CD / GitOps
-          ↓
- SRE Observability
+┌───────────────────────────────────┐
+│ Terraform Cloud Infrastructure    │
+│ Cloud foundation + networking     │
+└─────────────────┬─────────────────┘
+                  │
+                  ▼
+┌───────────────────────────────────┐
+│ Azure Kubernetes Platform         │
+│ AKS + identity + networking       │
+└─────────────────┬─────────────────┘
+                  │
+                  ▼
+┌───────────────────────────────────┐
+│ IAM / RBAC Automation             │
+│ Security validation + audit       │
+└─────────────────┬─────────────────┘
+                  │
+                  ▼
+┌───────────────────────────────────┐
+│ GitOps / CI/CD                    │
+│ Argo CD + DevSecOps               │
+└─────────────────┬─────────────────┘
+                  │
+                  ▼
+┌───────────────────────────────────┐
+│ SRE / Observability               │
+│ Metrics + logs + traces + SLOs    │
+└───────────────────────────────────┘
 ```
 
-## Technologies
+---
+
+## 🛠️ Technology stack
 
 **Azure · AKS · Terraform · Kubernetes · Azure RBAC · Managed Identity · Azure VNet · GitHub Actions · Helm · Linux · DevOps · SRE**
 
-## Author
+---
 
-Vasid Shaik  
+## 👨‍💻 Author
+
+**Vasid Shaik**  
 Cloud / DevOps / SRE Engineer
+
+[GitHub](https://github.com/ShaikVasid)
